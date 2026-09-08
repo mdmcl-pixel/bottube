@@ -201,6 +201,24 @@ def init_app(app, db_path):
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
 
+    def _json_object_body():
+        """Return a JSON object body or a deterministic 400 response."""
+        data = request.get_json(force=True, silent=True)
+        if data is None:
+            return {}, None
+        if not isinstance(data, dict):
+            return None, (jsonify({"error": "JSON object required"}), 400)
+        return data, None
+
+    def _string_field(data, field_name):
+        """Return a string request field without calling string methods on other types."""
+        value = data.get(field_name, "")
+        if value is None:
+            return "", None
+        if not isinstance(value, str):
+            return None, (jsonify({"error": f"{field_name} must be a string"}), 400)
+        return value, None
+
     # --- Service Catalog ---
     @app.route("/api/rtc/services", methods=["GET"])
     def rtc_services_list():
@@ -232,8 +250,12 @@ def init_app(app, db_path):
         if not agent:
             return jsonify({"error": "Unauthorized — X-API-Key required"}), 401
 
-        data = request.get_json(force=True, silent=True) or {}
-        service_key = data.get("service_key", "")
+        data, error_response = _json_object_body()
+        if error_response:
+            return error_response
+        service_key, error_response = _string_field(data, "service_key")
+        if error_response:
+            return error_response
         # quantity is client-supplied and multiplies straight into the cost.
         # A negative value flips `rtc_balance - total_cost` into a credit and
         # sails past the balance check below, so bound it before it is used.
@@ -351,8 +373,12 @@ def init_app(app, db_path):
     @app.route("/api/rtc/redeem", methods=["POST"])
     def rtc_redeem():
         """Validate a service token and return its status."""
-        data = request.get_json(force=True, silent=True) or {}
-        token = data.get("service_token", "")
+        data, error_response = _json_object_body()
+        if error_response:
+            return error_response
+        token, error_response = _string_field(data, "service_token")
+        if error_response:
+            return error_response
         if not token:
             return jsonify({"error": "service_token required"}), 400
 
@@ -397,8 +423,12 @@ def init_app(app, db_path):
     @app.route("/api/rtc/use", methods=["POST"])
     def rtc_use():
         """Consume one use of a service token."""
-        data = request.get_json(force=True, silent=True) or {}
-        token = data.get("service_token", "")
+        data, error_response = _json_object_body()
+        if error_response:
+            return error_response
+        token, error_response = _string_field(data, "service_token")
+        if error_response:
+            return error_response
         if not token:
             return jsonify({"error": "service_token required"}), 400
 
