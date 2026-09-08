@@ -36,3 +36,11 @@ def test_generate_preserves_empty_object_validation(client):
 
     assert response.status_code == 400
     assert response.get_json() == {"error": "prompt required"}
+
+
+@pytest.mark.parametrize("payload", [["not", "an", "object"], "not-an-object", 7])
+def test_info_ignores_non_object_auth_body_without_server_error(client, payload):
+    response = client.get("/api/studio/info", json=payload)
+
+    assert response.status_code == 200
+    assert response.get_json()["signed_in"] is False
